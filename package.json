@@ -1,0 +1,27 @@
+{
+  "name": "TextLibs",
+  "version": "0.0.0",
+  "description": "Madlibs over text messages.",
+  "main": "index.js",
+  "dependencies": {
+    "twilio": "~1.2.0",
+    "lodash": "~2.2.1",
+    "express": "~3.4.0"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/michael-younkin/TextLibs.git"
+  },
+  "keywords": [
+    "text",
+    "message",
+    "madlibs",
+    "twilio"
+  ],
+  "author": "Team 42",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/michael-younkin/TextLibs/issues"
+  }
+}
