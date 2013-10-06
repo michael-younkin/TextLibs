@@ -68,6 +68,11 @@ function handleInsertion(incomingNumber, contents, callback) {
   console.log('Current libs');
   console.dir(results);
   pendingLibs[incomingNumber] = undefined;
+  var response = '';
+  _.each(results, function(result) {
+    response += result + ' ';
+  });
+  sendSMS(incomingNumber, 'Current Nouns: ' + response, function() {});
   callback();
 }
 
