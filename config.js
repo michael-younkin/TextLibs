@@ -11,7 +11,8 @@ exports.web = {
 };
 
 exports.game = {
-  requestTimeout: 60000
+  requestTimeout: 60000,
+  madlibPath: 'madlibs'
 };
 
 _.each(exports.twilio, function(value, key) {

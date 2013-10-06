@@ -6,7 +6,8 @@
   "dependencies": {
     "twilio": "~1.2.0",
     "lodash": "~2.2.1",
-    "express": "~3.4.0"
+    "express": "~3.4.0",
+    "glob": "~3.2.6"
   },
   "devDependencies": {},
   "repository": {

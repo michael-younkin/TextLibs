@@ -4,6 +4,8 @@ var twilio = require('twilio');
 var config = require('./config');
 var _ = require('lodash');
 var express = require('express');
+var madlib = require('./madlib');
+
 var app = express(); 
 
 // Create a new REST API client to make authenticated requests against the
@@ -13,95 +15,141 @@ var client = new twilio.RestClient(
   config.twilio.auth
 );
 
-var blanks = [
-  "Misspelled version of real word, ending in -ly or -io",
-  "Verb",
-  "Plural Noun",
-  "Minor Celebrity",
-  "Gentrified Neighborhood",
-  "Obscure Ethnicity",
-  "Noun",
-  "Verb ending in -ate",
-  "Trivial stuff you like",
-  "Social media profile no one reads)",
-  "Gerund starting with \"crowd\"",
-  "Failing Industry",
-  "Verb that Implies Creativity",
-  "Noun form of Verb Ending in -ate",
-  "Boring Daily Task",
-  "Unmanageable thing",
-  "Adjective",
-  "Slightly Intimidating Acronym",
-  "Previous Startup with Record-Breaking IPO",
-  "First-World Problem",
-  "Euphemistic Gerund",
-  "Verb Involving Face-to-Face Interaction with Humans",
-  "Data No One Needs to Keep Track of Except Advertisers",
-  "Invasive, Data-Mining GPS-Based Service",
-  "Serious Verb",
-  "Fun Verb",
-  "Verb form of Startup Name"
-];
-var libs = {};
-var pendingNumbers = {};
-var participants = [];
+var currentMadlib;
+
+var activeNumbers = {};
+
+function activateNumber(number, wordIndex) {
+  activeNumbers[number] = wordIndex;
+}
+
+function deactivateNumber(number) {
+  console.log('deactivate ' + number);
+  delete activeNumbers[number];
+}
+
+function saveWord(number, index, word, callback) {
+  console.log('saving ' + word + ' to ' + index);
+  currentMadlib.blanks[index] = word;
+  callback(null);
+}
+
+function onMadlibComplete() {
+  var madlibText = currentMadlib.getFullText();
+  console.log('madlib completed');
+  console.log(madlibText);
+  var madlibParts = splitMadlib(madlibText);
+  _.each(currentMadlib.getParticipants(), function(number) {
+    _.each(madlibParts, function(part) {
+      sendSMS(number, part, function(err) {
+        if (err) {
+          console.error(err);
+        }
+      });
+    });
+  });
+  resetMadlib(function(err) {
+    if (err) {
+      throw err;
+    }
+  });
+}
+
+function blankIsAvailable() {
+  var numActiveBlanks = _.values(activeNumbers).length
+  console.log('num active blanks: ' + numActiveBlanks);
+  var numUnfilledBlanks = currentMadlib.getNumUnfilledBlanks();
+  return currentMadlib.getNumUnfilledBlanks() - numActiveBlanks;
+}
+
+function getAvailableBlank() {
+  var blanks = currentMadlib.getUnfilledBlanks();
+  console.log('unfilled blanks');
+  console.log(blanks);
+  var availableBlanks = [];
+  _.each(blanks, function(blankIndex) {
+    if (!_.contains(_.values(activeNumbers), blankIndex)) {
+      console.log(blankIndex + ' is not in activeNumbers and is available');
+      availableBlanks.push(blankIndex);
+    }
+  });
+  return availableBlanks[0];
+}
+
+function resetMadlib(callback) {
+  madlib.getMadLib(function(err, a) {
+    if (err) {
+      callback(err);
+      return;
+    }
+    currentMadlib = a;
+    callback(null, a);
+  });
+}
 
 app.configure(function() {
   app.use(express.bodyParser());
 });
 
 app.post('/incomingcall', function(req, res) {
-	console.log('received incoming call');
+	console.log('received incoming call from "' + req.body.From + '"');
+  var resp = new twilio.TwimlResponse();
+  resp.say({voice:'woman'}, 'Calls are not accepted. Please send a text.');
+  res.writeHead(200, {
+  'Content-Type':'text/xml'
+  });
+  res.end(resp.toString());
 });
 
 app.post('/incomingtext', function(req, res) {
-  console.log('received incoming text');
   var incomingNumber = req.body.From;
-  if (pendingNumbers[incomingNumber]) {
-    handleInsertion(incomingNumber, req.body.Body, function(err) {
-      if (err) {
-        throw err;
-      }
-    });
-  } else if (getNumMissingLibs() > 0) {
-    requestLib(incomingNumber, function(err) {
-      if (err) {
-        throw err;
-      }
-    });
+  var incomingMsg = req.body.Body;
+  console.log('received "' + incomingMsg + '" from "' + incomingNumber + '"');
+
+  function handleError(err) {
+    if (err) {
+      console.error(err);
+    }
+  }
+
+  if (incomingMsg === '_CALL_') {
+    // TODO call them with a completed madlib
+  } else if (numberIsActive(incomingNumber)) {
+    // The number was pending, so we were waiting on it to get a word for our
+    // madlib.
+    saveWord(incomingNumber, activeNumbers[incomingNumber], incomingMsg, handleError);
+    deactivateNumber(incomingNumber);
+
+    if (!currentMadlib.getNumUnfilledBlanks()) {
+      onMadlibComplete();
+    }
+  } else if (incomingMsg === '_ML_') {
+    if (blankIsAvailable()) {
+      var blankIndex = getAvailableBlank();
+      console.log('Selected blank at ' + blankIndex);
+      currentMadlib.addParticipant(incomingNumber);
+      activateNumber(incomingNumber, blankIndex);
+      sendSMS(
+        incomingNumber,
+        'Send us "' + currentMadlib.words[blankIndex].value + '"', 
+        handleError
+      );
+    } else {
+      sendSMS(
+        incomingNumber,
+        'No blanks are currently available, please try again later.',
+        handleError
+      );
+    }
   } else {
     sendSMS(
       incomingNumber,
-      'All libs are taken, please try again in a few  minutes.',
-      function(err) {
-        if (err) {
-          throw err;
-        }
-      }
+      'This is TextLibs: Massively Multiplayer Madlibs! Text _ML_ to ' +
+        'participate in the current madlib we\'re trying to complete!',
+      handleError
     );
   }
-  if (_.keys(libs).length === _.keys(blanks).length) {
-    console.log('mad lib complete');
-    console.dir(libs);
-    var madlib = printTextLib();
-    console.log(madlib);
-    _.each(participants, function(number) {
-      sendSMS(number, madlib, function(err) {
-        if (err) {
-          console.err('Failed to send madlib');
-        }
-      });
-    });
-    libs = {};
-  } else {
-    console.log('mad lib incomplete');
-    console.log(printTextLib());
-  }
 });
-
-function libsAreRemaining() {
-  return true;
-}
 
 function sendSMS(number, msg, callback) {
   client.sendSms({
@@ -111,133 +159,24 @@ function sendSMS(number, msg, callback) {
   }, callback);
 }
 
-function handleInsertion(incomingNumber, contents, callback) {
-  console.log('Insert ' + contents + ' from ' + incomingNumber);
-  var index = pendingNumbers[incomingNumber];
-  console.log('Inserted lib for index ' + index);
-  pendingNumbers[incomingNumber] = undefined;
-  libs[index] = contents;
-  sendSMS(incomingNumber, 'Thanks! Send another message to answer again.', function() {});
-  participants.push(incomingNumber);
-  participants = _.uniq(participants);
-  callback();
-}
-
-function requestLib(incomingNumber, callback) {
-  var missingLib = getMissingLib();
-  pendingNumbers[incomingNumber] = missingLib;
-  var neededValue = blanks[missingLib];
-  sendSMS(incomingNumber, 'Please send us a "' + neededValue + '"', function(err) {
-    if (err) {
-      pendingNumbers[incomingNumber] = undefined;
-      callback(err);
-    } else {
-      callback();
-    }
-  });
-  setTimeout(function() {
-    if (pendingNumbers[incomingNumber]) {
-      sendSMS(
-        incomingNumber,
-        'Too slow, send another message to start over',
-        function (err) { 
-          if (err) {
-            console.error('Error ocurred while sending SMS');
-            throw err; 
-          }
-        }
-      );
-      pendingNumbers[incomingNumber] = undefined;
-    } else {
-      console.log('timeout complete');
-    }
-  }, config.game.requestTimeout);
-}
-
-function getNumMissingLibs() {
-  return blanks.length - _.keys(libs).length;
-}
-
-function getMissingLib() {
-  if (getNumMissingLibs === 0) {
-    throw new Error('No missing libs found');
-  } else {
-    var missingLib = undefined;
-    _.each(_.keys(blanks), function(index) {
-      if (missingLib) {
-        return;
-      }
-      if (!libs[index] &&  !_.contains(_.values(pendingNumbers), index)) {
-        missingLib = index;
-      }
-    });
-    return missingLib;
+resetMadlib(function(err) {
+  if (err) {
+    throw err;
   }
+});
+
+function numberIsActive(number) {
+  return !!activeNumbers[number];
 }
 
-function printTextLib() {
-	var story = "Your startup name: " +
-	libs[0] +
-	". Have you ever wanted to " +
-	libs[1] +
-	" all sorts of " +
-	libs[2] +
-	" with friends, family, colleagues, or even " +
-	libs[3] +
-	", but didn't know how? Maybe you were just strolling the sidewalks of " +
-	libs[4] +
-	" past your favorite " +
-	libs[5] +
-	" bakery when you wished you could pull out your i" +
-	libs[6] +
-	" and use it to quickly " +
-	libs[7] +
-	" all your latest " +
-	libs[8] +
-	" and post it to your " +
-	libs[9] +
-	"? " +
-	libs[0] +
-	" is the answer. The fact is, we live in a world where " +
-	libs[10] +
-	" will revolutionize " +
-	libs[11] +
-	", and pretty soon you'll be able to " +
-	libs[12] +
-	" anything you want through the cloud. All this " +
-	libs[13] +
-	" is already changing the way we " +
-	libs[14] +
-	", but who has the tools to keep up with it? " +
-	libs[0] +
-	" is that tool. With our beautiful, user-friendly interface, you'll find that managing all your " +
-	libs[15] +
-	" is easier than ever-and " +
-	libs[16] +
-	"! Utilizing the power of " +
-	libs[17] +
-	" services with all the connectivity of " +
-	libs[18] +
-	", we can help you free yourself from tyranny of " +
-	libs[19] +
-	". In this rapidly " +
-	libs[20] +
-	" world of ours, it's hard to find the time to " +
-	libs[21] +
-	" or keep track of all the " +
-	libs[22] +
-	". " +
-	libs[0] +
-	" changes that. It puts the power of " +
-	libs[23] +
-	" at your fingertips. " +
-	libs[24] +
-	". " +
-	libs[25] +
-	". " +
-	libs[26] +
-	".";
-	return story;
+function splitMadlib(text) {
+  var parts = [];
+  while (text.length > 160) {
+    parts.push(text.substring(text.length - 161));
+    text = text.substring(0, text.length - 161);
+  }
+  parts.push(text);
+  return parts.reverse();
 }
 
 app.listen(config.web.port);
