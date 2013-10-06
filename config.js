@@ -10,8 +10,6 @@ exports.web = {
   port: 80
 };
 
-exports.collectSize = 3;
-
 _.each(exports.twilio, function(value, key) {
   if (!value) {
     throw new Error('Missing config value: "' + key + '"');
