@@ -1,5 +1,3 @@
-
-
 var blanks = [];
 var libs = [];
 var users = [];
@@ -106,34 +104,35 @@ function printTextLib() {
 }
 
 function init() {
-
-	blanks[0] = "Misspelled version of real word, ending in -ly or -io";
-	blanks[1] = "Verb";
-	blanks[2] = "Plural Noun";
-	blanks[3] = "Minor Celebrity";
-	blanks[4] = "Gentrified Neighborhood";
-	blanks[5] = "Obscure Ethnicity";
-	blanks[6] = "Noun";
-	blanks[7] = "Verb ending in -ate";
-	blanks[8] = "Trivial stuff you like";
-	blanks[9] = "Social media profile no one reads)";
-	blanks[10] = "Gerund starting with \"crowd\"";
-	blanks[11] = "Failing Industry";
-	blanks[12] = "Verb that Implies Creativity";
-	blanks[13] = "Noun form of Verb Ending in -ate";
-	blanks[14] = "Boring Daily Task";
-	blanks[15] = "Unmanageable thing";
-	blanks[16] = "Adjective";
-	blanks[17] = "Slightly Intimidating Acronym";
-	blanks[18] = "Previous Startup with Record-Breaking IPO";
-	blanks[19] = "First-World Problem";
-	blanks[20] = "Euphemistic Gerund";
-	blanks[21] = "Verb Involving Face-to-Face Interaction with Humans";
-	blanks[22] = "Data No One Needs to Keep Track of Except Advertisers";
-	blanks[23] = "Invasive, Data-Mining GPS-Based Service";
-	blanks[24] = "Serious Verb";
-	blanks[25] = "Fun Verb";
-	blanks[26] = "Verb form of Startup Name";
+  var blanks = [
+    "Misspelled version of real word, ending in -ly or -io",
+    "Verb",
+    "Plural Noun",
+    "Minor Celebrity",
+    "Gentrified Neighborhood",
+    "Obscure Ethnicity",
+    "Noun",
+    "Verb ending in -ate",
+    "Trivial stuff you like",
+    "Social media profile no one reads)",
+    "Gerund starting with \"crowd\"",
+    "Failing Industry",
+    "Verb that Implies Creativity",
+    "Noun form of Verb Ending in -ate",
+    "Boring Daily Task",
+    "Unmanageable thing",
+    "Adjective",
+    "Slightly Intimidating Acronym",
+    "Previous Startup with Record-Breaking IPO",
+    "First-World Problem",
+    "Euphemistic Gerund",
+    "Verb Involving Face-to-Face Interaction with Humans",
+    "Data No One Needs to Keep Track of Except Advertisers",
+    "Invasive, Data-Mining GPS-Based Service",
+    "Serious Verb",
+    "Fun Verb",
+    "Verb form of Startup Name"
+  ];
 
 	$('#blank').html(blanks[0]);
 }

@@ -10,6 +10,10 @@ exports.web = {
   port: 80
 };
 
+exports.game = {
+  requestTimeout: 60000
+};
+
 _.each(exports.twilio, function(value, key) {
   if (!value) {
     throw new Error('Missing config value: "' + key + '"');
